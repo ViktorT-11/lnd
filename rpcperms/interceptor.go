@@ -94,6 +94,14 @@ var (
 		"/lnrpc.State/SubscribeState": {},
 		"/lnrpc.State/GetState":       {},
 	}
+
+	// allowUnlockedWhitelist defines methods that we allow to be called
+	// when the wallet is unlocked, but the RPC server is not yet active.
+	// As the user may be waiting for a remote signer to connect during this
+	// state, transitioning to the next state may take some time.
+	allowUnlockedWhitelist = map[string]struct{}{
+		"/lnrpc.Lightning/StopDaemon": {},
+	}
 )
 
 // InterceptorChain is a struct that can be added to the running GRPC server,
@@ -708,7 +716,9 @@ func (r *InterceptorChain) MacaroonStreamServerInterceptor() grpc.StreamServerIn
 
 // checkRPCState checks whether a call to the given server is allowed in the
 // current RPC state.
-func (r *InterceptorChain) checkRPCState(srv interface{}) error {
+func (r *InterceptorChain) checkRPCState(srv interface{},
+	fullMethod string) error {
+
 	// The StateService is being accessed, we allow the call regardless of
 	// the current state.
 	_, ok := srv.(lnrpc.StateServer)
@@ -749,7 +759,12 @@ func (r *InterceptorChain) checkRPCState(srv interface{}) error {
 			return ErrWalletUnlocked
 		}
 
-		return ErrRPCStarting
+		// Only allow whitelisted calls until the full rpc server is
+		// active.
+		_, ok = allowUnlockedWhitelist[fullMethod]
+		if !ok {
+			return ErrRPCStarting
+		}
 
 	// If the RPC server or lnd server is active, we allow calls to any
 	// service except the WalletUnlocker.
@@ -772,9 +787,10 @@ func (r *InterceptorChain) rpcStateUnaryServerInterceptor() grpc.UnaryServerInte
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler) (interface{}, error) {
 
-		r.rpcsLog.Debugf("[%v] requested", info.FullMethod)
+		method := info.FullMethod
+		r.rpcsLog.Debugf("[%v] requested", method)
 
-		if err := r.checkRPCState(info.Server); err != nil {
+		if err := r.checkRPCState(info.Server, method); err != nil {
 			return nil, err
 		}
 
@@ -790,7 +806,7 @@ func (r *InterceptorChain) rpcStateStreamServerInterceptor() grpc.StreamServerIn
 
 		r.rpcsLog.Debugf("[%v] requested", info.FullMethod)
 
-		if err := r.checkRPCState(srv); err != nil {
+		if err := r.checkRPCState(srv, info.FullMethod); err != nil {
 			return err
 		}
 
