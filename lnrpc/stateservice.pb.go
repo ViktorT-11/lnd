@@ -31,6 +31,9 @@ const (
 	// UNLOCKED means that the wallet was unlocked successfully, but RPC server
 	// isn't ready.
 	WalletState_UNLOCKED WalletState = 2
+	// ALLOW_REMOTE_SIGNER means that the lnd server in a state where it's only
+	// ready to accept incoming connections from a remote signer.
+	WalletState_ALLOW_REMOTE_SIGNER WalletState = 5
 	// RPC_ACTIVE means that the lnd server is active but not fully ready for
 	// calls.
 	WalletState_RPC_ACTIVE WalletState = 3
@@ -47,17 +50,19 @@ var (
 		0:   "NON_EXISTING",
 		1:   "LOCKED",
 		2:   "UNLOCKED",
+		5:   "ALLOW_REMOTE_SIGNER",
 		3:   "RPC_ACTIVE",
 		4:   "SERVER_ACTIVE",
 		255: "WAITING_TO_START",
 	}
 	WalletState_value = map[string]int32{
-		"NON_EXISTING":     0,
-		"LOCKED":           1,
-		"UNLOCKED":         2,
-		"RPC_ACTIVE":       3,
-		"SERVER_ACTIVE":    4,
-		"WAITING_TO_START": 255,
+		"NON_EXISTING":        0,
+		"LOCKED":              1,
+		"UNLOCKED":            2,
+		"ALLOW_REMOTE_SIGNER": 5,
+		"RPC_ACTIVE":          3,
+		"SERVER_ACTIVE":       4,
+		"WAITING_TO_START":    255,
 	}
 )
 
@@ -258,12 +263,13 @@ const file_stateservice_proto_rawDesc = "" +
 	"\x05state\x18\x01 \x01(\x0e2\x12.lnrpc.WalletStateR\x05state\"\x11\n" +
 	"\x0fGetStateRequest\"<\n" +
 	"\x10GetStateResponse\x12(\n" +
-	"\x05state\x18\x01 \x01(\x0e2\x12.lnrpc.WalletStateR\x05state*s\n" +
+	"\x05state\x18\x01 \x01(\x0e2\x12.lnrpc.WalletStateR\x05state*\x8c\x01\n" +
 	"\vWalletState\x12\x10\n" +
 	"\fNON_EXISTING\x10\x00\x12\n" +
 	"\n" +
 	"\x06LOCKED\x10\x01\x12\f\n" +
-	"\bUNLOCKED\x10\x02\x12\x0e\n" +
+	"\bUNLOCKED\x10\x02\x12\x17\n" +
+	"\x13ALLOW_REMOTE_SIGNER\x10\x05\x12\x0e\n" +
 	"\n" +
 	"RPC_ACTIVE\x10\x03\x12\x11\n" +
 	"\rSERVER_ACTIVE\x10\x04\x12\x15\n" +
