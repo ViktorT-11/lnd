@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -273,6 +274,12 @@ type WalletKit struct {
 	UnimplementedWalletKitServer
 
 	cfg *Config
+
+	// As we allow rpc requests into the server before dependencies have
+	// been finalized, the read lock should be held in functions that
+	// accesses values from the cfg before dependencies are finalized.
+	// The write lock should be held when setting the cfg.
+	sync.RWMutex
 }
 
 // A compile time check to ensure that WalletKit fully implements the
@@ -303,6 +310,9 @@ func (w *WalletKit) InjectDependencies(
 	if finalizeDependencies && atomic.AddInt32(&w.injected, 1) != 1 {
 		return lnrpc.ErrDependenciesFinalized
 	}
+
+	w.Lock()
+	defer w.Unlock()
 
 	cfg, err := getConfig(configRegistry, finalizeDependencies)
 	if err != nil {
@@ -466,6 +476,7 @@ func (w *WalletKit) ListUnspent(ctx context.Context,
 	// any other concurrent processes attempting to lock any UTXOs which may
 	// be shown available to us.
 	var utxos []*lnwallet.Utxo
+
 	err = w.cfg.CoinSelectionLocker.WithCoinSelectLock(func() error {
 		utxos, err = w.cfg.Wallet.ListUnspentWitness(
 			minConfs, maxConfs, req.Account,
@@ -492,14 +503,22 @@ func (w *WalletKit) ListUnspent(ctx context.Context,
 func (w *WalletKit) SignCoordinatorStreams(
 	stream WalletKit_SignCoordinatorStreamsServer) error {
 
+	w.RLock()
+
 	// Check that the user actually has configured that the reverse remote
 	// signer functionality should be enabled.
 	if w.cfg.RemoteSignerConnection == nil {
+		w.RUnlock()
+
 		return fmt.Errorf("inbound connections from remote signers " +
 			"not enabled in config")
 	}
 
 	connectionCoordinator := w.cfg.RemoteSignerConnection
+
+	// Release the read lock as we will acquire the write in the
+	// InjectDependencies function while the stream is still open.
+	w.RUnlock()
 
 	return connectionCoordinator.AddConnection(stream)
 }
