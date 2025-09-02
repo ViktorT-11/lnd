@@ -132,15 +132,15 @@ var (
 // migrationOption is a functional option that can be passed to migrate related
 // methods to modify their behavior.
 type migrateOptions struct {
-	latestVersion     fn.Option[uint]
-	postStepCallbacks map[uint]migrate.PostStepCallback
+	latestVersion  fn.Option[uint]
+	migrationTasks map[uint]migrate.MigrationTask
 }
 
 // defaultMigrateOptions returns a new migrateOptions instance with default
 // settings.
 func defaultMigrateOptions() *migrateOptions {
 	return &migrateOptions{
-		postStepCallbacks: make(map[uint]migrate.PostStepCallback),
+		migrationTasks: make(map[uint]migrate.MigrationTask),
 	}
 }
 
@@ -156,18 +156,19 @@ func WithLatestVersion(version uint) MigrateOpt {
 	}
 }
 
-// WithPostStepCallbacks is an option that can be used to set a map of
-// PostStepCallback functions that can be used to execute a Golang based
-// migration step after a SQL based migration step has been executed. The key is
-// the migration version and the value is the callback function that should be
-// run _after_ the step was executed (but before the version is marked as
-// cleanly executed). An error returned from the callback will cause the
-// migration to fail and the step to be marked as dirty.
-func WithPostStepCallbacks(
-	postStepCallbacks map[uint]migrate.PostStepCallback) MigrateOpt {
+// WithMigrationTasks is an option that can be used to set a map of migration
+// task functions that can be used to execute a Golang based migration step
+// after a SQL based migration step has been executed. The key is the migration
+// version and the value is the migration task function that should be run
+// _after_ the step was executed (but before the version is marked as cleanly
+// executed). An error returned from the migration task will cause the migration
+// to fail. Note that in case the migration task fails, the task will be re-run
+// on the next migration attempt, i.e., on the next restart.
+func WithMigrationTasks(
+	migrationTasks map[uint]migrate.MigrationTask) MigrateOpt {
 
 	return func(o *migrateOptions) {
-		o.postStepCallbacks = postStepCallbacks
+		o.migrationTasks = migrationTasks
 	}
 }
 
@@ -226,7 +227,7 @@ func applyMigrations(fs fs.FS, driver database.Driver, path,
 	// above.
 	sqlMigrate, err := migrate.NewWithInstance(
 		"migrations", migrateFileServer, dbName, driver,
-		migrate.WithPostStepCallbacks(opts.postStepCallbacks),
+		migrate.WithMigrationTasks(opts.migrationTasks),
 	)
 	if err != nil {
 		return err

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	sqlite_migrate "github.com/golang-migrate/migrate/v4/database/sqlite"
-	"github.com/lightningnetwork/lnd/sqldb/sqlc"
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite" // Register relevant drivers.
 )
@@ -137,14 +136,14 @@ func NewSqliteStore(cfg *SqliteConfig, dbPath string) (*SqliteStore, error) {
 	db.SetMaxOpenConns(defaultMaxConns)
 	db.SetMaxIdleConns(defaultMaxConns)
 	db.SetConnMaxLifetime(connIdleLifetime)
-	queries := sqlc.New(db)
 
 	s := &SqliteStore{
 		Config: cfg,
 		DbPath: dbPath,
 		BaseDB: &BaseDB{
-			DB:      db,
-			Queries: queries,
+			DB:             db,
+			BackendType:    BackendTypeSqlite,
+			SkipMigrations: cfg.SkipMigrations,
 		},
 	}
 
@@ -252,12 +251,12 @@ func (s *SqliteStore) ExecuteMigrations(target MigrationTarget,
 		latestVersion: fn.Some(stream.LatestMigrationVersion),
 	}
 
-	if stream.MakePostMigrationChecks != nil {
-		postMigSteps, err := stream.MakePostMigrationChecks(s.BaseDB)
+	if stream.MakeMigrationTasks != nil {
+		migTasks, err := stream.MakeMigrationTasks(s.BaseDB)
 		if err != nil {
 			return errPostgresMigration(err)
 		}
-		opts.postStepCallbacks = postMigSteps
+		opts.migrationTasks = migTasks
 	}
 
 	// Populate the database with our set of schemas based on our embedded
