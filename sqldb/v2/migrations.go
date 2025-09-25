@@ -243,6 +243,11 @@ func applyMigrations(fs fs.FS, driver database.Driver, path,
 	if err != nil {
 		return fmt.Errorf("unable to get latest version: %w", err)
 	}
+
+	migrationVersion = uint(
+		migrate.SQLMigrationVersion(int(migrationVersion)),
+	)
+
 	if migrationVersion > latestVersion {
 		return fmt.Errorf("%w: database version is newer than the "+
 			"latest migration version, preventing downgrade: "+
@@ -255,9 +260,17 @@ func applyMigrations(fs fs.FS, driver database.Driver, path,
 	if err != nil {
 		return fmt.Errorf("unable to get current db version: %w", err)
 	}
-	log.Infof("Attempting to apply migration(s) "+
+
+	if migrate.InTaskVersionRange(currentDbVersion) {
+		log.Infof("Previously failed migration task detected for "+
+			"migration %v, will re-attempt the migration task "+
+			"prior to any database migration(s)",
+			migrate.SQLMigrationVersion(currentDbVersion))
+	}
+
+	log.Infof("Attempting to apply migration(s) and migration task(s)"+
 		"(current_db_version=%v, latest_migration_version=%v)",
-		currentDbVersion, latestVersion)
+		migrate.SQLMigrationVersion(currentDbVersion), latestVersion)
 
 	// Apply our local logger to the migration instance.
 	sqlMigrate.Log = &migrationLogger{log}

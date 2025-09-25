@@ -203,6 +203,8 @@ func backupSqliteDatabase(srcDB *sql.DB, dbFullFilePath string) error {
 func (s *SqliteStore) backupAndMigrate(mig *migrate.Migrate,
 	currentDbVersion int, maxMigrationVersion uint) error {
 
+	currentDbVersion = migrate.SQLMigrationVersion(currentDbVersion)
+
 	// Determine if a database migration is necessary given the current
 	// database version and the maximum migration version.
 	versionUpgradePending := currentDbVersion < int(maxMigrationVersion)
