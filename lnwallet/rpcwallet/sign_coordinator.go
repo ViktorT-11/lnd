@@ -145,6 +145,8 @@ func (s *SignCoordinator) Run(stream StreamServer) error {
 	}
 
 	if s.clientConnected {
+		s.mu.Unlock()
+
 		// If we already have a stream, we error out as we can only have
 		// one connection at a time.
 		return ErrMultipleConnections
