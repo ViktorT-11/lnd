@@ -147,7 +147,7 @@ func NewOutboundConnection(ctx context.Context,
 	err := remoteSigner.connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to the remote "+
-			"signing node through RPC: %v", err)
+			"signing node through RPC: %w", err)
 	}
 
 	return remoteSigner, nil
