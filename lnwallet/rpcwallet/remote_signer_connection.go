@@ -212,7 +212,11 @@ func (r *OutboundConnection) Timeout() time.Duration {
 // NOTE: This is part of the RemoteSignerConnection interface.
 func (r *OutboundConnection) Stop() {
 	if r.conn != nil {
-		r.conn.Close()
+		err := r.conn.Close()
+		if err != nil {
+			log.Errorf("error closing remote signer connection: %v",
+				err)
+		}
 	}
 }
 
