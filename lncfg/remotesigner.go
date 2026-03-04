@@ -11,9 +11,9 @@ const (
 	// through RPC.
 	DefaultRemoteSignerRPCTimeout = 5 * time.Second
 
-	// DefaultRequestTimeout is the default timeout used for requests to and
-	// from the remote signer.
-	DefaultRequestTimeout = 5 * time.Second
+	// DefaultRemoteSignerRequestTimeout is the default timeout used for
+	// requests to and from the remote signer.
+	DefaultRemoteSignerRequestTimeout = 5 * time.Second
 
 	// DefaultStartupTimeout is the default startup timeout used when a
 	// watch-only node with 'remotesigner.allowinboundconnection' set to
@@ -171,7 +171,7 @@ type ConnectionCfg struct {
 func defaultConnectionCfg() ConnectionCfg {
 	return ConnectionCfg{
 		Timeout:        DefaultRemoteSignerRPCTimeout,
-		RequestTimeout: DefaultRequestTimeout,
+		RequestTimeout: DefaultRemoteSignerRequestTimeout,
 	}
 }
 
