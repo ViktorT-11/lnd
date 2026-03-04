@@ -908,12 +908,6 @@ func (r *RPCKeyRing) MuSig2CombineSig(sessionID input.MuSig2SessionID,
 	return finalSig, resp.HaveAllSignatures, nil
 }
 
-// RemoteSignerConnection returns the remote signer connection instance that is
-// used by the RPC key ring to sign transactions.
-func (r *RPCKeyRing) RemoteSignerConnection() RemoteSignerConnection {
-	return r.remoteSignerConn
-}
-
 // ReadySignal returns a channel that signals once the wallet is ready to be
 // used, i.e. once the remote signer is connected. If we time out while waiting,
 // an error gets sent over the channel. This method overrides/shadows the
