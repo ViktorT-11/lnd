@@ -2040,11 +2040,11 @@ func (s *server) createLivenessMonitor(ctx context.Context, cfg *Config,
 			"remote signer connection",
 			rpcwallet.HealthCheck(
 				ctx,
-				rpckKeyRing.RemoteSignerConnection(),
 				// For the health check we might to be even
 				// stricter than the initial/normal connect, so
 				// we use the health check timeout.
 				innerTimeout,
+				rpckKeyRing.Ping,
 			),
 			cfg.HealthChecks.RemoteSigner.Interval,
 			outerTimeout,
