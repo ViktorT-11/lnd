@@ -642,23 +642,28 @@ func Main(cfg *Config, lisCfg ListenerCfg, implCfg *ImplementationCfg,
 	dedicatedRemoteSignerRPC := cfg.RemoteSigner.AllowInboundConnection &&
 		len(cfg.RemoteSigner.RPCListeners) > 0
 	if dedicatedRemoteSignerRPC {
-		rpcKeyRing, ok := activeChainControl.Wallet.WalletController.(*rpcwallet.RPCKeyRing)
+		type inboundType = rpcwallet.InboundRemoteSignerConnProvider
+		connProvider, ok := activeChainControl.Wallet.
+			WalletController.(inboundType)
+
 		if !ok {
-			return mkErr("incorrect WalletController type", errors.New(
-				"expected *rpcwallet.RPCKeyRing for inbound "+
-					"remote signer RPC server",
-			))
+			err = errors.New("expected inbound remote signer " +
+				"connection provider for remote  signer RPC " +
+				"server",
+			)
+			return mkErr("incorrect WalletController type", err)
 		}
 
-		inboundRemoteSignerConn, ok := rpcKeyRing.RemoteSignerConnection().(rpcwallet.InboundRemoteSignerConnection)
+		inboundRemoteSignerConn, ok := connProvider.
+			InboundRemoteSignerConnection()
 		if !ok {
 			return mkErr("incorrect remote signer connection type",
 				errors.New("expected inbound remote signer "+
 					"connection implementation"))
 		}
 
-		remoteSignerGRPCServer, remoteSignerListeners,
-			remoteSignerInterceptor, err := startInboundRemoteSignerRPCServer(
+		rsGRPCServer, rsListeners,
+			rsInterceptor, err := startInboundRemoteSignerRPCServer(
 			cfg, baseServerOpts, serverKeepalive, clientKeepalive,
 			interceptorChain, inboundRemoteSignerConn,
 		)
@@ -666,18 +671,19 @@ func Main(cfg *Config, lisCfg ListenerCfg, implCfg *ImplementationCfg,
 			return mkErr("error starting inbound remote signer RPC "+
 				"server", err)
 		}
-		if remoteSignerGRPCServer != nil {
-			defer remoteSignerGRPCServer.Stop()
+		if rsGRPCServer != nil {
+			defer rsGRPCServer.Stop()
 		}
-		if remoteSignerInterceptor != nil {
+		if rsInterceptor != nil {
 			defer func() {
-				if err := remoteSignerInterceptor.Stop(); err != nil {
-					ltndLog.Warnf("error stopping remote signer "+
-						"RPC interceptor chain: %v", err)
+				if err := rsInterceptor.Stop(); err != nil {
+					ltndLog.Warnf("error stopping remote "+
+						"signer RPC interceptor "+
+						"chain: %v", err)
 				}
 			}()
 		}
-		for _, lis := range remoteSignerListeners {
+		for _, lis := range rsListeners {
 			defer lis.Close()
 		}
 	}
