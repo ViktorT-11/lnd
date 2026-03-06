@@ -250,9 +250,9 @@ watch-only> $ lncli bakemacaroon --root_key $ROOT_KEY \
 --save_to /home/signer/example/watch-only.custom.macaroon remotesigner:generate
 ```
 
-**Note:** The `save_to` path should match the `remotesigner.macaroonpath`
+**Note:** The `save_to` path should match the `watchonlynode.macaroonpath`
 specified in step 1. If the signer and watch-only nodes are on separate
-environments, move the macaroon to the `remotesigner.macaroonpath` after baking
+environments, move the macaroon to the `watchonlynode.macaroonpath` after baking
 it instead.
 
 Also note that the watch-only node does not need to be running to execute this
