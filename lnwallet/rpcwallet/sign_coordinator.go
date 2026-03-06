@@ -44,6 +44,19 @@ var (
 	ErrUnexpectedResponse = errors.New("unexpected response type")
 )
 
+// requestInfo tracks the response delivery state for a single in-flight
+// request sent to the remote signer.
+type requestInfo struct {
+	// respChan is the per-request response channel that StartReceiving uses
+	// to deliver the remote signer response back to the waiting request.
+	respChan chan *RSResponse
+
+	// respQuit is closed when the waiting request context is canceled or
+	// completed. StartReceiving uses this to avoid sending a response to a
+	// request that is no longer waiting for it.
+	respQuit <-chan struct{}
+}
+
 // SignCoordinator is an implementation of the signrpc.SignerClient and the
 // walletrpc.WalletKitClient interfaces that passes on all requests to a remote
 // signer. It is used by the watch-only wallet to delegate any signing or ECDH
@@ -59,7 +72,8 @@ type SignCoordinator struct {
 	// stream is a bi-directional stream between us and the remote signer.
 	stream StreamServer
 
-	// responses is a map of request IDs to response channels. This map
+	// responses is a map of request IDs to response channels and request
+	// lifecycle channels. This map
 	// should be populated with a response channel for each request that has
 	// been sent to the remote signer. The response channel should be
 	// inserted into the map before the request is sent.
@@ -67,7 +81,7 @@ type SignCoordinator struct {
 	// associated response channel in this map is ignored.
 	// The response channel should be removed from the map when the response
 	// has been received and processed.
-	responses *lnutils.SyncMap[uint64, chan *RSResponse]
+	responses *lnutils.SyncMap[uint64, requestInfo]
 
 	// receiveErrChan is used to signal that the stream with the remote
 	// signer has errored, and we can no longer process responses.
@@ -109,7 +123,7 @@ var _ RemoteSignerRequests = (*SignCoordinator)(nil)
 func NewSignCoordinator(requestTimeout time.Duration,
 	connectionTimeout time.Duration) *SignCoordinator {
 
-	respsMap := &lnutils.SyncMap[uint64, chan *RSResponse]{}
+	respsMap := &lnutils.SyncMap[uint64, requestInfo]{}
 
 	s := &SignCoordinator{
 		responses:         respsMap,
@@ -408,7 +422,7 @@ func (s *SignCoordinator) StartReceiving() {
 			return
 		}
 
-		respChan, ok := s.responses.Load(resp.GetRefRequestId())
+		reqInfo, ok := s.responses.Load(resp.GetRefRequestId())
 
 		if ok {
 			select {
@@ -416,13 +430,18 @@ func (s *SignCoordinator) StartReceiving() {
 			// channel, as the channel allows for a buffer of 1, and
 			// we shouldn't have multiple requests and responses for
 			// the same request ID.
-			case respChan <- resp:
+			case reqInfo.respChan <- resp:
 
 			case <-s.quit:
 				return
 
-			// The timeout case be unreachable, as we should always
-			// be able to send 1 response over the response channel.
+			// This request was canceled, do not try to send any
+			// response for this request ID.
+			case <-reqInfo.respQuit:
+
+			// The timeout case should be unreachable, as we should
+			// always be able to send 1 response over the response
+			// channel.
 			// We keep this case just to avoid a scenario where the
 			// receive loop would be blocked if we receive multiple
 			// responses for the same request ID.
@@ -484,12 +503,18 @@ func (s *SignCoordinator) WaitUntilConnected(ctx context.Context) error {
 // which removes the channel from the responses map, and the caller must ensure
 // that this cleanup function is executed once the thread that's waiting for
 // the response is done.
-func (s *SignCoordinator) createResponseChannel(requestID uint64) func() {
+func (s *SignCoordinator) createResponseChannel(requestID uint64,
+	respQuit <-chan struct{}) func() {
+
 	// Create a new response channel.
 	respChan := make(chan *RSResponse, 1)
 
-	// Insert the response channel into the map.
-	s.responses.Store(requestID, respChan)
+	// Insert the response channel and request lifecycle channel into the
+	// map.
+	s.responses.Store(requestID, requestInfo{
+		respChan: respChan,
+		respQuit: respQuit,
+	})
 
 	// Create a cleanup function that will delete the response channel.
 	return func() {
@@ -529,7 +554,7 @@ func (s *SignCoordinator) getResponse(ctx context.Context,
 
 	// Wait for the response to arrive.
 	select {
-	case resp, ok := <-respChan:
+	case resp, ok := <-respChan.respChan:
 		if !ok {
 			// If the response channel was closed, we return an
 			// error as the receiving thread must have timed out
@@ -928,8 +953,12 @@ func processRequest[R comparable](ctx context.Context, s *SignCoordinator,
 	reqID := s.nextRequestID.Add(1)
 	req := generateRequest(reqID)
 
-	cleanUpChannel := s.createResponseChannel(reqID)
-	defer cleanUpChannel()
+	reqCtx, cancelReq := context.WithCancel(ctx)
+	cleanUpChannel := s.createResponseChannel(reqID, reqCtx.Done())
+	defer func() {
+		cancelReq()
+		cleanUpChannel()
+	}()
 
 	log.Debugf("Sending a %T to the remote signer with request ID %d",
 		req.SignRequestType, reqID)
@@ -968,7 +997,7 @@ func processRequest[R comparable](ctx context.Context, s *SignCoordinator,
 	// Wait for the remote signer response for the given request. We will
 	// wait for the configured request timeout, or until the context is
 	// cancelled/timed out.
-	resp, err = s.getResponse(ctx, reqID)
+	resp, err = s.getResponse(reqCtx, reqID)
 
 	if errors.Is(err, ErrNotConnected) {
 		// If the remote signer disconnected while we were waiting for
