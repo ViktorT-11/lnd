@@ -624,6 +624,7 @@ func (r *OutboundClient) waitForRequest(ctx context.Context, stream *Stream) (
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
+
 	case err := <-errChan:
 		if err != nil {
 			return nil, fmt.Errorf("error receiving request: %w",
