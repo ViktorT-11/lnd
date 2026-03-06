@@ -110,6 +110,12 @@ type SignCoordinator struct {
 	// signer to connect.
 	connectionTimeout time.Duration
 
+	// sendMu serializes stream send operations, since gRPC stream Send is
+	// not safe for concurrent use from multiple goroutines. We use a
+	// separate mutex to keep the locking scope minimal and avoid locking
+	// the rest of the struct while sending messages.
+	sendMu sync.Mutex
+
 	mu sync.Mutex
 
 	wg sync.WaitGroup
@@ -979,7 +985,14 @@ func processRequest[R comparable](ctx context.Context, s *SignCoordinator,
 		)
 	}
 
+	// Send the request to the remote signer. Note that stream.Send is not
+	// safe for concurrent use and that we specifically lock the sendMu
+	// below and not general struct mutex, to keep the locking scope
+	// minimal.
+	s.sendMu.Lock()
 	err = s.stream.Send(&req)
+	s.sendMu.Unlock()
+
 	if err != nil {
 		st, isStatusError := status.FromError(err)
 		if isStatusError && st.Code() == codes.Unavailable {
