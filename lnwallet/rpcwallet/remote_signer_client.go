@@ -24,21 +24,21 @@ import (
 )
 
 type (
-	// signerResponse is a type alias for the SignCoordinator response type,
+	// RSResponse is a type alias for the SignCoordinator response type,
 	// created to keep line length within 80 characters.
-	signerResponse = remotesignerrpc.SignCoordinatorResponse
+	RSResponse = remotesignerrpc.SignCoordinatorResponse
 
-	// registrationResp is a type alias for the registration response type,
-	// created to keep line length within 80 characters.
-	registrationResp = remotesignerrpc.SignCoordinatorRequest_RegistrationResponse
+	// RSRegistrationResponse is a type alias for the registration response
+	// type, created to keep line length within 80 characters.
+	RSRegistrationResponse = remotesignerrpc.SignCoordinatorRequest_RegistrationResponse
 
-	// completeType is a type alias for the registration complete type,
-	// created to keep line length within 80 characters.
-	completeType = remotesignerrpc.RegistrationResponse_RegistrationComplete
+	// RSRegistrationComplete is a type alias for the registration complete
+	// type, created to keep line length within 80 characters.
+	RSRegistrationComplete = remotesignerrpc.RegistrationResponse_RegistrationComplete
 
-	// signerRegType is a type alias for the signer registration type,
+	// RSRegistration is a type alias for the signer registration type,
 	// created to keep line length within 80 characters.
-	signerRegType = remotesignerrpc.SignCoordinatorResponse_SignerRegistration
+	RSRegistration = remotesignerrpc.SignCoordinatorResponse_SignerRegistration
 )
 
 var (
@@ -486,7 +486,7 @@ func (r *OutboundClient) handshake(ctx context.Context, stream *Stream) error {
 	// The RegistrationChallenge should also be set to a randomized string.
 	var registrationMsg = &remotesignerrpc.SignCoordinatorResponse{
 		RefRequestId: handshakeRequestID,
-		SignResponseType: &signerRegType{
+		SignResponseType: &RSRegistration{
 			SignerRegistration: &remotesignerrpc.SignerRegistration{
 				RegistrationChallenge: []byte(
 					"registrationChallenge",
@@ -534,7 +534,7 @@ func (r *OutboundClient) handshake(ctx context.Context, stream *Stream) error {
 	}
 
 	// Check the type of the response message.
-	resp, ok := msg.GetSignRequestType().(*registrationResp)
+	resp, ok := msg.GetSignRequestType().(*RSRegistrationResponse)
 	if !ok {
 		return fmt.Errorf("expected registration response, but got: %T",
 			msg.GetSignRequestType())
@@ -543,7 +543,7 @@ func (r *OutboundClient) handshake(ctx context.Context, stream *Stream) error {
 	switch rType := resp.RegistrationResponse.
 		GetRegistrationResponseType().(type) {
 	// The registration was successful.
-	case *completeType:
+	case *RSRegistrationComplete:
 		// TODO(viktor): This should verify that the signature in the
 		// complete message is valid.
 		return nil
@@ -637,7 +637,7 @@ func (r *OutboundClient) waitForRequest(ctx context.Context, stream *Stream) (
 // formResponse processes the received request from the watch-only node, and
 // sends the corresponding response back.
 func (r *OutboundClient) formResponse(ctx context.Context,
-	req *remotesignerrpc.SignCoordinatorRequest) *signerResponse {
+	req *remotesignerrpc.SignCoordinatorRequest) *RSResponse {
 
 	resp, err := r.process(ctx, req)
 	if err != nil {
@@ -653,7 +653,7 @@ func (r *OutboundClient) formResponse(ctx context.Context,
 			},
 		}
 
-		resp = &signerResponse{
+		resp = &RSResponse{
 			RefRequestId:     req.GetRequestId(),
 			SignResponseType: eType,
 		}
@@ -665,7 +665,7 @@ func (r *OutboundClient) formResponse(ctx context.Context,
 // process sends the passed request on to the appropriate server for processing
 // it, and returns the response.
 func (r *OutboundClient) process(ctx context.Context,
-	req *remotesignerrpc.SignCoordinatorRequest) (*signerResponse, error) {
+	req *remotesignerrpc.SignCoordinatorRequest) (*RSResponse, error) {
 
 	r.log.DebugS(ctx, "Processing a request from watch-only",
 		btclog.Fmt("request_type", "%T", req.GetSignRequestType()))
@@ -675,7 +675,7 @@ func (r *OutboundClient) process(ctx context.Context,
 
 	var (
 		requestID = req.GetRequestId()
-		signResp  = &signerResponse{
+		signResp  = &RSResponse{
 			RefRequestId: requestID,
 		}
 	)
@@ -860,7 +860,7 @@ func (r *OutboundClient) process(ctx context.Context,
 
 // sendResponse sends the passed response back to the watch-only node over the
 // stream.
-func (r *OutboundClient) sendResponse(ctx context.Context, resp *signerResponse,
+func (r *OutboundClient) sendResponse(ctx context.Context, resp *RSResponse,
 	stream *Stream) error {
 
 	// Timeout sending the response if it takes too long.
