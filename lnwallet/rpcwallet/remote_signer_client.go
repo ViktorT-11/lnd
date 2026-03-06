@@ -65,8 +65,8 @@ const (
 	// attempting to reconnect to the watch-only node.
 	defaultMaxRetryTimeout = time.Minute * 1
 
-	// handshakeRequestID is the request ID that is reversed for the
-	// handshake with the watch-only node.
+	// handshakeRequestID is the request ID reserved for the handshake with
+	// the watch-only node.
 	handshakeRequestID = uint64(1)
 )
 
