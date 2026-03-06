@@ -287,12 +287,7 @@ type OutboundClient struct {
 	// watch-only node.
 	requestTimeout time.Duration
 
-	// retryTimeout is the backoff timeout used when retrying to set up a
-	// connection to the watch-only node, if the previous connection/attempt
-	// failed.
-	retryTimeout time.Duration
-
-	// maxRetryTimeout is the max value for the retryTimeout, defining
+	// maxRetryTimeout is the max value for the retry timeout, defining
 	// the maximum backoff period before attempting to reconnect to the
 	// watch-only node.
 	maxRetryTimeout time.Duration
@@ -326,7 +321,6 @@ func NewOutboundClient(walletServer walletrpc.WalletKitServer,
 		signerServer:    signerServer,
 		streamFeeder:    streamFeeder,
 		requestTimeout:  requestTimeout,
-		retryTimeout:    defaultRetryTimeout,
 		maxRetryTimeout: defaultMaxRetryTimeout,
 		cg:              fn.NewContextGuard(),
 		gManager:        fn.NewGoroutineManager(),
@@ -356,6 +350,13 @@ func (r *OutboundClient) Start(ctx context.Context) error {
 // and retry to connect if the connection fails until we Stop the remote
 // signer client.
 func (r *OutboundClient) runForever(ctx context.Context) {
+	// retryTimeout is the current backoff timeout used when retrying to set
+	// up a connection to the watch-only node, if the previous
+	// connection/attempt failed. The variable is reset to the
+	// defaultRetryTimeout once a successful connection is set up with the
+	// watch-only node.
+	retryTimeout := defaultRetryTimeout
+
 	for {
 		// Check if we are shutting down.
 		select {
@@ -364,34 +365,39 @@ func (r *OutboundClient) runForever(ctx context.Context) {
 		default:
 		}
 
-		err := r.runOnce(ctx)
+		connected, err := r.runOnce(ctx)
 		if err != nil {
 			r.log.ErrorS(ctx, "runOnce error", err)
+		}
+
+		// Reset the retry timeout after a successful connection.
+		if connected {
+			retryTimeout = defaultRetryTimeout
 		}
 
 		r.log.InfoS(
 			ctx,
 			"Connection retry to watch-only node scheduled",
-			"retry_after", r.retryTimeout,
+			"retry_after", retryTimeout,
 		)
 
 		// Backoff before retrying to connect to the watch-only node.
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(r.retryTimeout):
+		case <-time.After(retryTimeout):
 		}
 
 		r.log.InfoS(ctx, "Retrying to connect to watch-only node")
 
 		// Increase the retry timeout by 50% for every retry.
-		r.retryTimeout = time.Duration(
-			float64(r.retryTimeout) * retryMultiplier,
+		retryTimeout = time.Duration(
+			float64(retryTimeout) * retryMultiplier,
 		)
 
-		// But cap the retryTimeout at r.maxRetryTimeout
-		if r.retryTimeout > r.maxRetryTimeout {
-			r.retryTimeout = r.maxRetryTimeout
+		// But cap the retryTimeout at r.maxRetryTimeout.
+		if retryTimeout > r.maxRetryTimeout {
+			retryTimeout = r.maxRetryTimeout
 		}
 	}
 }
@@ -426,7 +432,7 @@ func (r *OutboundClient) MustImplementRemoteSignerClient() {}
 // and responding to the sign requests that are sent over the stream. The
 // function will continuously run until the remote signer client is either
 // stopped or the stream errors.
-func (r *OutboundClient) runOnce(ctx context.Context) error {
+func (r *OutboundClient) runOnce(ctx context.Context) (bool, error) {
 	// Derive a context for the lifetime of the stream.
 	ctx, cancel := r.cg.Create(ctx)
 
@@ -438,7 +444,7 @@ func (r *OutboundClient) runOnce(ctx context.Context) error {
 	// Try to get a new stream to the watch-only node.
 	stream, err := r.streamFeeder.GetStream(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer func() {
 		err := stream.Close()
@@ -453,15 +459,12 @@ func (r *OutboundClient) runOnce(ctx context.Context) error {
 	// requests.
 	err = r.handshake(ctx, stream)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	log.InfoS(ctx, "Completed setup connection to watch-only node")
 
-	// Reset the retry timeout after a successful connection.
-	r.retryTimeout = defaultRetryTimeout
-
-	return r.processSignRequestsForever(ctx, stream)
+	return true, r.processSignRequestsForever(ctx, stream)
 }
 
 // handshake performs the handshake process with the watch-only node. As we are
