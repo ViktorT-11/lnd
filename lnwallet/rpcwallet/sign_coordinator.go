@@ -67,7 +67,7 @@ type SignCoordinator struct {
 	// associated response channel in this map is ignored.
 	// The response channel should be removed from the map when the response
 	// has been received and processed.
-	responses *lnutils.SyncMap[uint64, chan *signerResponse]
+	responses *lnutils.SyncMap[uint64, chan *RSResponse]
 
 	// receiveErrChan is used to signal that the stream with the remote
 	// signer has errored, and we can no longer process responses.
@@ -109,7 +109,7 @@ var _ RemoteSignerRequests = (*SignCoordinator)(nil)
 func NewSignCoordinator(requestTimeout time.Duration,
 	connectionTimeout time.Duration) *SignCoordinator {
 
-	respsMap := &lnutils.SyncMap[uint64, chan *signerResponse]{}
+	respsMap := &lnutils.SyncMap[uint64, chan *RSResponse]{}
 
 	s := &SignCoordinator{
 		responses:         respsMap,
@@ -486,7 +486,7 @@ func (s *SignCoordinator) WaitUntilConnected(ctx context.Context) error {
 // the response is done.
 func (s *SignCoordinator) createResponseChannel(requestID uint64) func() {
 	// Create a new response channel.
-	respChan := make(chan *signerResponse, 1)
+	respChan := make(chan *RSResponse, 1)
 
 	// Insert the response channel into the map.
 	s.responses.Store(requestID, respChan)
@@ -515,7 +515,7 @@ func (s *SignCoordinator) createResponseChannel(requestID uint64) func() {
 // Note: Before calling this function, the caller must have created a response
 // channel for the request ID.
 func (s *SignCoordinator) getResponse(ctx context.Context,
-	requestID uint64) (*signerResponse, error) {
+	requestID uint64) (*RSResponse, error) {
 
 	respChan, ok := s.responses.Load(requestID)
 
@@ -629,7 +629,7 @@ func (s *SignCoordinator) Ping(ctx context.Context,
 				SignRequestType: req,
 			}
 		},
-		func(resp *signerResponse) bool {
+		func(resp *RSResponse) bool {
 			return resp.GetPong()
 		},
 	)
@@ -655,7 +655,7 @@ func (s *SignCoordinator) DeriveSharedKey(ctx context.Context,
 				SignRequestType: req,
 			}
 		},
-		func(resp *signerResponse) *signrpc.SharedKeyResponse {
+		func(resp *RSResponse) *signrpc.SharedKeyResponse {
 			return resp.GetSharedKeyResponse()
 		},
 	)
@@ -681,7 +681,7 @@ func (s *SignCoordinator) MuSig2Cleanup(ctx context.Context,
 				SignRequestType: req,
 			}
 		},
-		func(resp *signerResponse) *signrpc.MuSig2CleanupResponse {
+		func(resp *RSResponse) *signrpc.MuSig2CleanupResponse {
 			return resp.GetMuSig2CleanupResponse()
 		},
 	)
@@ -707,7 +707,7 @@ func (s *SignCoordinator) MuSig2CombineSig(ctx context.Context,
 				SignRequestType: req,
 			}
 		},
-		func(resp *signerResponse) *signrpc.MuSig2CombineSigResponse {
+		func(resp *RSResponse) *signrpc.MuSig2CombineSigResponse {
 			return resp.GetMuSig2CombineSigResponse()
 		},
 	)
@@ -733,7 +733,7 @@ func (s *SignCoordinator) MuSig2CreateSession(ctx context.Context,
 				SignRequestType: req,
 			}
 		},
-		func(resp *signerResponse) *signrpc.MuSig2SessionResponse {
+		func(resp *RSResponse) *signrpc.MuSig2SessionResponse {
 			return resp.GetMuSig2SessionResponse()
 		},
 	)
@@ -762,7 +762,7 @@ func (s *SignCoordinator) MuSig2RegisterNonces(ctx context.Context,
 				SignRequestType: req,
 			}
 		},
-		func(resp *signerResponse) muSig2RegisterNoncesResp {
+		func(resp *RSResponse) muSig2RegisterNoncesResp {
 			return resp.GetMuSig2RegisterNoncesResponse()
 		},
 	)
@@ -789,7 +789,7 @@ func (s *SignCoordinator) MuSig2RegisterCombinedNonce(ctx context.Context,
 				SignRequestType: req,
 			}
 		},
-		func(resp *signerResponse) muSig2RegCombNResp {
+		func(resp *RSResponse) muSig2RegCombNResp {
 			return resp.GetMuSig2CombNoncesResp()
 		},
 	)
@@ -815,7 +815,7 @@ func (s *SignCoordinator) MuSig2GetCombinedNonce(ctx context.Context,
 				SignRequestType: req,
 			}
 		},
-		func(resp *signerResponse) muSig2GetCombNonceResp {
+		func(resp *RSResponse) muSig2GetCombNonceResp {
 			return resp.GetMuSig2GetCombNoncesResp()
 		},
 	)
@@ -841,7 +841,7 @@ func (s *SignCoordinator) MuSig2Sign(ctx context.Context,
 				SignRequestType: req,
 			}
 		},
-		func(resp *signerResponse) *signrpc.MuSig2SignResponse {
+		func(resp *RSResponse) *signrpc.MuSig2SignResponse {
 			return resp.GetMuSig2SignResponse()
 		},
 	)
@@ -867,7 +867,7 @@ func (s *SignCoordinator) SignMessage(ctx context.Context,
 				SignRequestType: req,
 			}
 		},
-		func(resp *signerResponse) *signrpc.SignMessageResp {
+		func(resp *RSResponse) *signrpc.SignMessageResp {
 			return resp.GetSignMessageResp()
 		},
 	)
@@ -893,7 +893,7 @@ func (s *SignCoordinator) SignPsbt(ctx context.Context,
 				SignRequestType: req,
 			}
 		},
-		func(resp *signerResponse) *walletrpc.SignPsbtResponse {
+		func(resp *RSResponse) *walletrpc.SignPsbtResponse {
 			return resp.GetSignPsbtResponse()
 		},
 	)
@@ -906,7 +906,7 @@ func (s *SignCoordinator) SignPsbt(ctx context.Context,
 // the individual operations within the function.
 func processRequest[R comparable](ctx context.Context, s *SignCoordinator,
 	generateRequest func(uint64) remotesignerrpc.SignCoordinatorRequest,
-	extractResponse func(*signerResponse) R) (R, error) {
+	extractResponse func(*RSResponse) R) (R, error) {
 
 	var zero R
 
