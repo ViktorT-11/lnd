@@ -19,6 +19,8 @@ message SignCoordinatorRequest {
     /*
     A unique request ID of a SignCoordinator gRPC request. Useful for mapping
     requests to responses.
+    Note that request_id 1 is reserved for the handshake with between
+    watch-only node and the remote signer.
     */
     uint64 request_id = 1;
 

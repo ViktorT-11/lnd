@@ -29,6 +29,8 @@ type SignCoordinatorRequest struct {
 
 	// A unique request ID of a SignCoordinator gRPC request. Useful for mapping
 	// requests to responses.
+	// Note that request_id 1 is reserved for the handshake with between
+	// watch-only node and the remote signer.
 	RequestId uint64 `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	// Messages between the watch-only node and the remote signer can only be of
 	// certain types.
