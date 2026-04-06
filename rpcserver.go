@@ -700,7 +700,7 @@ func newRPCServer(cfg *Config, interceptorChain *rpcperms.InterceptorChain,
 // sub-server configuration with the remote signer connection, and insert the
 // permissions required to access the sub-servers into the interceptor chain.
 func (r *rpcServer) prepareSubServers(macService *macaroons.Service,
-	subServerCgs *subRPCServerConfigs, cc *chainreg.ChainControl) error {
+	subServerCgs *subRPCServerConfigs) error {
 
 	var (
 		subServers     []lnrpc.SubServer
