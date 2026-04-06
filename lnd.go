@@ -534,37 +534,15 @@ func Main(cfg *Config, lisCfg ListenerCfg, implCfg *ImplementationCfg,
 		}
 	}()
 
-	// If an inbound remote signer is configured, start the dedicated RPC
-	// server before waiting for the wallet to become ready. This RPC is not
-	// served by the main RPC server.
-	dedicatedWatchOnlyRPC := cfg.RemoteSigner.AllowInboundConnection &&
-		len(cfg.RemoteSigner.RPCListeners) > 0
-	if dedicatedWatchOnlyRPC {
-		type inboundType = rpcwallet.InboundRemoteSignerConnProvider
-		connProvider, ok := activeChainControl.Wallet.
-			WalletController.(inboundType)
-
-		if !ok {
-			err = errors.New("expected inbound remote signer " +
-				"connection provider for remote  signer RPC " +
-				"server",
-			)
-
-			return mkErr("incorrect WalletController type", err)
-		}
-
-		inboundRemoteSignerConn, ok := connProvider.
-			InboundRemoteSignerConnection()
-		if !ok {
-			return mkErr("incorrect remote signer connection type",
-				errors.New("expected inbound remote signer "+
-					"connection implementation"))
-		}
-
+	// If the chain control returned an inbound remote signer connection,
+	// start the dedicated RPC server for it. This RPC is not served by
+	// the main RPC server.
+	if chainControlResult.InboundRemoteSignerConn != nil {
 		rsGRPCServer, rsListeners,
 			rsInterceptor, err := startInboundWatchOnlyRPCServer(
 			cfg, baseServerOpts, serverKeepalive, clientKeepalive,
-			interceptorChain, inboundRemoteSignerConn,
+			interceptorChain,
+			chainControlResult.InboundRemoteSignerConn,
 		)
 		if err != nil {
 			return mkErr("error starting inbound remote signer "+
