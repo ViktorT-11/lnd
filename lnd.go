@@ -514,7 +514,6 @@ func Main(cfg *Config, lisCfg ListenerCfg, implCfg *ImplementationCfg,
 	// keys create the required dependencies.
 	err = rpcServer.prepareSubServers(
 		interceptorChain.MacaroonService(), cfg.SubRPCServers,
-		activeChainControl,
 	)
 	if err != nil {
 		return mkErr("error adding sub server permissions", err)
