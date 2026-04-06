@@ -498,14 +498,22 @@ func Main(cfg *Config, lisCfg ListenerCfg, implCfg *ImplementationCfg,
 
 	defer cleanUp()
 
-	activeChainControl, cleanUp, err := implCfg.BuildChainControl(
+	chainControlResult, err := implCfg.BuildChainControl(
 		partialChainControl, walletConfig,
 	)
 	if err != nil {
+		if chainControlResult != nil &&
+			chainControlResult.CleanUp != nil {
+
+			chainControlResult.CleanUp()
+		}
+
 		return mkErr("error loading chain control", err)
 	}
 
-	defer cleanUp()
+	defer chainControlResult.CleanUp()
+
+	activeChainControl := chainControlResult.ChainControl
 
 	// Prepare the sub-servers, and insert the permissions required to
 	// access them into the interceptor chain. Note that we do not yet have
