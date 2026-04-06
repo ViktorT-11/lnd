@@ -187,10 +187,6 @@ var (
 			Entity: "onchain",
 			Action: "write",
 		}},
-		"/walletrpc.WalletKit/SignCoordinatorStreams": {{
-			Entity: "remotesigner",
-			Action: "generate",
-		}},
 	}
 
 	// DefaultWalletKitMacFilename is the default name of the wallet kit
@@ -496,31 +492,6 @@ func (w *WalletKit) ListUnspent(ctx context.Context,
 	return &ListUnspentResponse{
 		Utxos: rpcUtxos,
 	}, nil
-}
-
-// SignCoordinatorStreams opens a bi-directional streaming RPC, which is used
-// to allow a remote signer to process sign requests on behalf of the wallet.
-func (w *WalletKit) SignCoordinatorStreams(
-	stream WalletKit_SignCoordinatorStreamsServer) error {
-
-	w.RLock()
-
-	// Check that the user actually has configured that the reverse remote
-	// signer functionality should be enabled.
-	if w.cfg.RemoteSignerConnection == nil {
-		w.RUnlock()
-
-		return fmt.Errorf("inbound connections from remote signers " +
-			"not enabled in config")
-	}
-
-	connectionCoordinator := w.cfg.RemoteSignerConnection
-
-	// Release the read lock as we will acquire the write in the
-	// InjectDependencies function while the stream is still open.
-	w.RUnlock()
-
-	return connectionCoordinator.AddConnection(stream)
 }
 
 // LeaseOutput locks an output to the given ID, preventing it from being
