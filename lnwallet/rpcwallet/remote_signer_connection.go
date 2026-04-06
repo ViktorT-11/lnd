@@ -12,6 +12,7 @@ import (
 	"github.com/lightningnetwork/lnd/lncfg"
 	"github.com/lightningnetwork/lnd/lnrpc/signrpc"
 	"github.com/lightningnetwork/lnd/lnrpc/walletrpc"
+	"github.com/lightningnetwork/lnd/lnrpc/watchonlyrpc"
 	"github.com/lightningnetwork/lnd/macaroons"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -20,8 +21,8 @@ import (
 )
 
 type (
-	StreamClient = walletrpc.WalletKit_SignCoordinatorStreamsClient
-	StreamServer = walletrpc.WalletKit_SignCoordinatorStreamsServer
+	StreamClient = watchonlyrpc.WatchOnly_SignCoordinatorStreamsClient
+	StreamServer = watchonlyrpc.WatchOnly_SignCoordinatorStreamsServer
 )
 
 // RemoteSignerConnection is an interface that abstracts the communication with
@@ -51,7 +52,7 @@ type RemoteSignerConnection interface {
 
 // RemoteSignerRequests is an interface that defines the requests that can be
 // sent to a remote signer. It's a subset of the signrpc.SignerClient and
-// walletrpc.WalletKitClient interfaces.
+// wallet/signing RPC interfaces used for remote signer coordination.
 type RemoteSignerRequests interface {
 	// DeriveSharedKey sends a SharedKeyRequest to the remote signer and
 	// waits for the corresponding response.
