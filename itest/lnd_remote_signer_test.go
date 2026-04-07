@@ -121,6 +121,10 @@ var remoteSignerTestCases = []*lntest.TestCase{
 		TestFunc: testRemoteSignerSignVerifyMsgOutbound,
 	},
 	{
+		Name:     "default inbound listen port outbound",
+		TestFunc: testRemoteSignerDefaultInboundListenPortOutbound,
+	},
+	{
 		Name:     "taproot",
 		TestFunc: testRemoteSignerTaproot,
 	},
@@ -407,6 +411,56 @@ func testRemoteSignerRandomSeed(ht *lntest.HarnessTest) {
 // remote signing wallet to perform any signing or ECDH operations.
 func testRemoteSignerRandomSeedOutbound(ht *lntest.HarnessTest) {
 	executeRemoteSignerTestCase(ht, randomSeedTestCase(true))
+}
+
+// testRemoteSignerDefaultInboundListenPortOutbound tests that the dedicated
+// inbound remote signer RPC listener defaults to the remote signer port if no
+// explicit port is configured.
+func testRemoteSignerDefaultInboundListenPortOutbound(ht *lntest.HarnessTest) {
+	password := []byte("itestpassword")
+
+	watchOnly := ht.CreateNewNode(
+		"WatchOnly", []string{
+			"--remotesigner.enable",
+			"--remotesigner.allowinboundconnection",
+			"--remotesigner.timeout=30s",
+			"--remotesigner.requesttimeout=30s",
+			"--remotesigner.rpclisten=localhost",
+		}, password, true,
+	)
+
+	signer := ht.RestoreNodeWithSeed(
+		"Signer", []string{
+			"--watchonlynode.enable",
+			"--watchonlynode.timeout=30s",
+			"--watchonlynode.requesttimeout=10s",
+			fmt.Sprintf(
+				"--watchonlynode.rpchost=localhost:%d",
+				lncfg.DefaultRemoteSignerListenPort,
+			),
+			fmt.Sprintf(
+				"--watchonlynode.tlscertpath=%s",
+				watchOnly.Cfg.TLSCertPath,
+			),
+			fmt.Sprintf(
+				"--watchonlynode.macaroonpath=%s",
+				watchOnly.Cfg.AdminMacPath,
+			),
+		}, password, nil, rootKey, 0, nil,
+	)
+
+	ht.StartWatchOnly(watchOnly, "WatchOnly", password,
+		&lnrpc.WatchOnly{
+			MasterKeyBirthdayTimestamp: 0,
+			MasterKeyFingerprint:       nil,
+			Accounts: deriveCustomScopeAccounts(
+				ht.T,
+			),
+		},
+	)
+
+	resp := watchOnly.RPC.GetInfo()
+	require.Equal(ht, signer.PubKeyStr, resp.IdentityPubkey)
 }
 
 func accountImportTestCase(isOutbound bool) remoteSignerTestCase {
