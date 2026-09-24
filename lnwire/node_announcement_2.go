@@ -7,11 +7,18 @@ import (
 	"fmt"
 	"image/color"
 	"io"
+	"math"
 	"net"
 	"unicode/utf8"
 
 	"github.com/lightningnetwork/lnd/tlv"
 	"github.com/lightningnetwork/lnd/tor"
+)
+
+// ErrNodeAnn2PortOutOfRange is returned when an address cannot represent its
+// port as the unsigned 16-bit value required on the wire.
+var ErrNodeAnn2PortOutOfRange = errors.New(
+	"node announcement address port outside uint16 range",
 )
 
 // NodeAnnouncement2 message is used to announce the presence of a Lightning
@@ -438,6 +445,10 @@ func (a *IPV4Addrs) encodedSize() uint64 {
 func ipv4AddrsEncoder(w io.Writer, val interface{}, _ *[8]byte) error {
 	if v, ok := val.(*IPV4Addrs); ok {
 		for _, ip := range *v {
+			if err := validateNodeAnn2Port(ip.Port); err != nil {
+				return err
+			}
+
 			_, err := w.Write(ip.IP.To4())
 			if err != nil {
 				return err
@@ -518,6 +529,10 @@ func (a *IPV6Addrs) encodedSize() uint64 {
 func ipv6AddrsEncoder(w io.Writer, val interface{}, _ *[8]byte) error {
 	if v, ok := val.(*IPV6Addrs); ok {
 		for _, ip := range *v {
+			if err := validateNodeAnn2Port(ip.Port); err != nil {
+				return err
+			}
+
 			_, err := w.Write(ip.IP.To16())
 			if err != nil {
 				return err
@@ -597,6 +612,10 @@ func (a *TorV3Addrs) Record() tlv.Record {
 func torV3AddrsEncoder(w io.Writer, val interface{}, _ *[8]byte) error {
 	if v, ok := val.(*TorV3Addrs); ok {
 		for _, addr := range *v {
+			if err := validateNodeAnn2Port(addr.Port); err != nil {
+				return err
+			}
+
 			encodedHostLen := tor.V3Len - tor.OnionSuffixLen
 			host, err := tor.Base32Encoding.DecodeString(
 				addr.OnionService[:encodedHostLen],
@@ -626,6 +645,17 @@ func torV3AddrsEncoder(w io.Writer, val interface{}, _ *[8]byte) error {
 	}
 
 	return tlv.NewTypeForEncodingErr(val, "lnwire.TorV3Addrs")
+}
+
+// validateNodeAnn2Port ensures a locally constructed address cannot wrap when
+// converted to its two-byte wire representation. Port zero remains encodable
+// so received signed records can be reproduced byte for byte.
+func validateNodeAnn2Port(port int) error {
+	if port < 0 || port > math.MaxUint16 {
+		return fmt.Errorf("%w: %d", ErrNodeAnn2PortOutOfRange, port)
+	}
+
+	return nil
 }
 
 // torV3AddrsDecoder decodes TLV bytes into Tor v3 addresses.
