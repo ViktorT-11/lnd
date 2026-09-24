@@ -128,7 +128,7 @@ func (c *ChannelUpdate2) Decode(r io.Reader, _ uint32) error {
 	}
 	c.Signature.Val.ForceSchnorr()
 
-	if err := AssertRequiredPresent(
+	if err := assertRequiredPresent(
 		typeMap,
 		c.ShortChannelID.TlvType(),
 		c.BlockHeight.TlvType(),

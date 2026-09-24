@@ -154,7 +154,7 @@ func (n *NodeAnnouncement2) Decode(r io.Reader, _ uint32) error {
 		return err
 	}
 
-	if err := AssertRequiredPresent(
+	if err := assertRequiredPresent(
 		typeMap,
 		n.Features.TlvType(),
 		n.BlockHeight.TlvType(),

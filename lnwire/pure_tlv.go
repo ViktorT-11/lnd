@@ -82,12 +82,12 @@ func InUnsignedRange(t tlv.Type) bool {
 		t >= pureTLVUnsignedRangeTwoStart
 }
 
-// AssertRequiredPresent returns an error if any of the given TLV types is
+// assertRequiredPresent returns an error if any of the given TLV types is
 // missing from the parsed type map (as returned by the various
 // DecodeWithParsedTypes helpers). It is used to enforce the spec's
 // reader-side requirement that compulsory TLVs are present in a received
 // pure-TLV message.
-func AssertRequiredPresent(typeMap tlv.TypeMap, required ...tlv.Type) error {
+func assertRequiredPresent(typeMap tlv.TypeMap, required ...tlv.Type) error {
 	for _, t := range required {
 		if _, ok := typeMap[t]; !ok {
 			return fmt.Errorf("required TLV type %d missing", t)
