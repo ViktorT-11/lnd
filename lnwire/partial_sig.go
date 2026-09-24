@@ -289,6 +289,8 @@ func (a *AnnouncementSigPair) Record() tlv.Record {
 	)
 }
 
+// announcementSigPairEncoder encodes the node and bitcoin partial signatures
+// as two consecutive 32-byte scalars.
 func announcementSigPairEncoder(w io.Writer, val interface{},
 	_ *[8]byte) error {
 
@@ -309,6 +311,8 @@ func announcementSigPairEncoder(w io.Writer, val interface{},
 	return err
 }
 
+// announcementSigPairDecoder decodes the node and bitcoin partial signatures
+// and rejects scalars outside the curve order.
 func announcementSigPairDecoder(r io.Reader, val interface{}, buf *[8]byte,
 	l uint64) error {
 
