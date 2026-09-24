@@ -32,10 +32,7 @@ type AnnounceSignatures2 struct {
 	PartialSignature tlv.RecordT[tlv.TlvType4, PartialSig]
 
 	// FundingTxID is the txid of the funding transaction that this
-	// announcement signature covers. For an initial channel announcement
-	// this is the original funding transaction; for a spliced channel it
-	// is the txid of the splice transaction whose splice_locked triggered
-	// the new round of announcement signing.
+	// announcement signature covers.
 	//
 	// The txid is in the internal byte order of chainhash.Hash, which is
 	// the order Bitcoin uses on the wire and the reverse of the displayed
@@ -102,7 +99,7 @@ func (a *AnnounceSignatures2) Decode(r io.Reader, _ uint32) error {
 		return err
 	}
 
-	if err := AssertRequiredPresent(
+	if err := assertRequiredPresent(
 		typeMap,
 		a.ChannelID.TlvType(),
 		a.ShortChannelID.TlvType(),
