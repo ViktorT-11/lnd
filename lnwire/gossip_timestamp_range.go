@@ -68,6 +68,8 @@ type BlockHeightRange struct {
 // type number is supplied by the wrapping RecordT.
 func (b *BlockHeightRange) Record() tlv.Record {
 	sizeFunc := func() uint64 {
+		// FirstBlockHeight is a fixed-width u32, followed by the
+		// variable-width tu32 encoding of NumBlocks.
 		return 4 + tlv.SizeTUint32(b.NumBlocks)
 	}
 
@@ -77,6 +79,8 @@ func (b *BlockHeightRange) Record() tlv.Record {
 	)
 }
 
+// blockHeightRangeEncoder encodes a fixed-width first block height followed by
+// a truncated block count.
 func blockHeightRangeEncoder(w io.Writer, val interface{},
 	buf *[8]byte) error {
 
@@ -92,6 +96,8 @@ func blockHeightRangeEncoder(w io.Writer, val interface{},
 	return tlv.ETUint32T(w, v.NumBlocks, buf)
 }
 
+// blockHeightRangeDecoder decodes a fixed-width first block height followed by
+// a truncated block count.
 func blockHeightRangeDecoder(r io.Reader, val interface{}, buf *[8]byte,
 	l uint64) error {
 
